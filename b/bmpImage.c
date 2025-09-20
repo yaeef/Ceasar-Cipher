@@ -1,6 +1,22 @@
 //Declaracion de las funciones definidas en el archivo de cabezera
 //Para el procesamiento de una imagen bmp de 24 bits 
 
+//Función que verifica argumentos CLI
+void checkCLI(int argc, char flag)
+{
+  if(argc != 3)
+  {
+    printf("\n\n\t.:Error en numero de argumentos CLI:.\n\n");
+    exit(1);
+  }
+  if(flag == '?')
+  {
+    printf("\n\n\t.:Error en flag seleccionada [e,d]:.\n\n");
+    exit(1);
+  }
+}
+
+
 //Funcion para lectura del BITMAPFILEHEADER, i.e, los primeros 14 bytes del header
 int scanBMFH(BITMAPFILEHEADER *header, char *imageName)
 {
@@ -46,30 +62,30 @@ int scanBMIH(BITMAPINFOHEADERV3X *header, char *imageName)
     return 0;
 }
 //Funcion para verificar que la imagen puede ser procesada.
-void checkBMP(char *signature, int dataOffset, int sizeHeader, short int bitCount, int compression)
+void checkBMP(BITMAPINFOHEADERV3X headerInfo, BITMAPFILEHEADER headerFile)
 {
 
-    if((*(signature) != 66) || (*(signature+1) != 77))
+    if((headerFile.signature[0] != 66) || (headerFile.signature[1] != 77))
     {
         printf("\n\n\t.:Error de archivo. Error->[Firma incorrecta]");
         exit(1);
     }
-    if(dataOffset != 54)
+    if(headerFile.dataOffset != 54)
     {
         printf("\n\n\t.:Error de archivo. Error->[Header incompatible]");
         exit(1);
     }
-    if(sizeHeader != 40)
+    if(headerInfo.sizeHeader != 40)
     {
         printf("\n\n\t.:Error de archivo. Error->[Header incompatible]");
         exit(1);
     }
-    if(bitCount != 24)
+    if(headerInfo.bitCount != 24)
     {
         printf("\n\n\t.:Error de archivo. Error->[La imagen debe de ser de 24 bits]");
         exit(1);
     }
-    if(compression != 0)
+    if(headerInfo.compression != 0)
     {
         printf("\n\n\t.:Error de archivo. Error->[Imagen debe ser sin compresion]");
         exit(1);
@@ -121,55 +137,54 @@ void scanColors(unsigned char **M, int height, int dataOffset, int padded ,char 
     }
     fclose(bmpImage);
 }
-//Funcion para desplazar los bytes de color de la imagen bmp
-void shiftColors(unsigned char **M, int height, int width, int padded, int shift)
-{
-    for(int i=0; i<height;i++)
-        for(int j=0; j < 6*width-padded; j+=3)                //De esta manera se itera solo los bytes de pixel y no los bytes de relleno
-        {
-            *(*(M+i)+j) = (*(*(M+i)+j) + shift) % 256;        //M[i][j] = (M[i][j] + shift) % 256;
-            *(*(M+i)+j+1) = (*(*(M+i)+j+1) + shift) % 256;    //M[i][j+1] = (M[i][j+1] + shift) % 256;
-            *(*(M+i)+j+2) = (*(*(M+i)+j+2) + shift) % 256;    //M[i][j+2] = (M[i][j+2] + shift) % 256;
-        }
-}
-//crear nueva imagen
-void createBMP(BITMAPFILEHEADER headerFile, BITMAPINFOHEADERV3X headerInfo, unsigned char **M, int height, int padded, char *newName)
-{
-    FILE *newImage = fopen(newName, "wb");
-    if(newImage == NULL)
-    {
-        printf("\n\n\t.:Error en creacion de imagen. Funcion->[createBMP()]\n\n");
-        exit(1);
-    }
 
-    fwrite(&headerFile, sizeof(BITMAPFILEHEADER), 1, newImage);
-    fwrite(&headerInfo, sizeof(BITMAPINFOHEADERV3X), 1, newImage);
-
-    for(int i=0;i < headerInfo.height; i++)
-        fwrite(M[i], padded, 1, newImage );
-    fclose(newImage);
+//Función que lee la cantidad a desplazar la imagen
+int scanShifting()
+{
+  int s;
+  system("clear");
+  printf("\n\n\tIngresa desplazamiento: ");
+  scanf("%d", &s);
+  while(0 > s || s > 257)
+  {
+    system("clear");
+    printf("\n\n\tDesplazamiento incorrecto d->[0-256]");
+    printf("\n\tIngresa desplazamiento: ");
+    scanf("%d", &s);
+  }
+  return s;
 }
 
-//Funcion que verifica el argumento parado mediante CLI para elegir cifrado o decifrado de imagen
-int checkArg(int argc, char **argv)
+//Función que calcula el inverso en aritmética modular para restaurar la imagen
+int scanInverse(int c)
 {
-    if(argc < 3 )
-    {
-        printf("\n\n\tError en argumentos CLI. Funcion->[checkArg()]\n\n.:");
-        exit(1);
-    }
-    if(!((strcmp("-e", *(argv+1)) == 0) || (strcmp("-d", *(argv+1)) == 0)))      
-    {
-        printf("\n\n\tArgumento invalido. Argumentos posibles: [-e][-d]. Funcion->[checkArg()]\n\n.:");
-        exit(1);
-    }
-    if(strcmp("-e", *(argv+1)) == 0)                                     //1 -> cifrar
-        return 1;
-    else
-        return 2;                                                        //2 -> decifrar
+  return ((c - 171) >= 0) ? ((256 - (c - 171)%256)) : ((171 -c)%256);
+  //return ((FIRST_COLOR - c) >= 0) ? ((FIRST_COLOR - c)%256) : ((256 + FIRST_COLOR - c)%256);
 }
+
+//Función que lleva a cabo el desplazamiento en la matriz de colores
+void ceasarCipher(unsigned char **M, int height, int width, int padding, int shift)
+{
+  for(int i=0; i<height; i++)
+    for(int j=0; j < 6*width-padding; j+=3)                //De esta manera se itera solo los bytes de pixel y no los bytes de relleno
+    {
+        *(*(M+i)+j) = (*(*(M+i)+j) + shift) % 256;        //M[i][j] = (M[i][j] + shift) % 256;
+        *(*(M+i)+j+1) = (*(*(M+i)+j+1) + shift) % 256;    //M[i][j+1] = (M[i][j+1] + shift) % 256;
+        *(*(M+i)+j+2) = (*(*(M+i)+j+2) + shift) % 256;    //M[i][j+2] = (M[i][j+2] + shift) % 256;
+    }
+}
+
+//Función de cifrado y decifrado
+void endec(unsigned char **M, int opt, int height, int width, int padding)
+{
+  if(opt == 'e')
+    ceasarCipher(M, height, width, padding, scanShifting());
+  else
+    ceasarCipher(M, height, width, padding, scanInverse(*(*(M+0)+0)));         //Se pasa el primer color de la imagen
+}
+
 //Funcion que ngenera el nuevo nombre der archivo procesado
-char* createNewName(char *fileName, int typeOfOp)
+char* createNewName(char *originalName, int opt)
 {
     int i=0;
     char *newName = (char*)malloc(sizeof(char)*MAXLENSTRING);
@@ -178,13 +193,13 @@ char* createNewName(char *fileName, int typeOfOp)
         printf("\n\n\t.:Error en creacion de nombre nuevo. Funcion->[createNewName()]\n\n");
         exit(1);
     }
-    if(typeOfOp == 2)   //Nuevo nombre para decifrado
+    while(*(originalName +i) != '.')
     {
-        while(fileName[i] != 46)
-        {
-            newName[i] = fileName[i];
-            i++;
-        }
+      *(newName + i) = *(originalName + i);
+      i++;
+    }
+    if(opt == 'd')   //Nuevo nombre para decifrado
+    {
         newName[i] = '_';
         newName[i+1] = 'd';
         newName[i+2] = '.';
@@ -195,11 +210,6 @@ char* createNewName(char *fileName, int typeOfOp)
     }
     else         //Nuevo nombre para cifrado 
     {
-        while(fileName[i] != 46)
-        {
-            newName[i] = fileName[i];
-            i++;
-        }
         newName[i] = '_';
         newName[i+1] = 'e';
         newName[i+2] = '.';
@@ -209,4 +219,17 @@ char* createNewName(char *fileName, int typeOfOp)
         newName[i+6] = '\0';
     }
     return newName;
+}
+
+//Función que escribe la nueva imagen, tanto el header como la matriz de colores
+void createNewBMP(unsigned char **M, BITMAPFILEHEADER headerFile, BITMAPINFOHEADERV3X headerInfo, int padding, char *originalName, int opt)
+{
+  char *newName = createNewName(originalName, opt);
+  FILE *newImage = fopen(newName, "wb"); //Falta comprobación de creación del archivo
+  fwrite(&headerFile, sizeof(BITMAPFILEHEADER), 1, newImage);
+  fwrite(&headerInfo, sizeof(BITMAPINFOHEADERV3X), 1, newImage);
+  for(int i=0; i<headerInfo.height; i++)
+    fwrite(M[i], padding, 1, newImage);
+  fclose(newImage);
+  free(newName);
 }

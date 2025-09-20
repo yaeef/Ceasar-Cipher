@@ -2,9 +2,7 @@
 //en imagenes bmp de 24 bits, sin compresion y con un HEADER V3 Standard
 
 
-
-#define FIRSTCOLOR 128    //Colores: Gris~[128][128][128] | Rojo~[0][0][255] | Blanco~[255][255][255]
-#define MAXLENSTRING 100
+#define MAXLENSTRING 256
 #pragma pack(push, 1)
 typedef struct
 {   
@@ -30,15 +28,18 @@ typedef struct
 }BITMAPINFOHEADERV3X;
 #pragma pack(pop)
 
+void checkCLI(int , char );
 int scanBMFH(BITMAPFILEHEADER*, char*);
 int scanBMIH(BITMAPINFOHEADERV3X*, char*);
-void checkBMP(char*, int, int, short int, int);
+void checkBMP(BITMAPINFOHEADERV3X, BITMAPFILEHEADER);
 unsigned char **createMatrix(int, int);
 void destroyMatrix(unsigned char**, int, int);
 void scanColors(unsigned char**, int, int, int ,char*);
-void shiftColors(unsigned char**, int, int, int, int);
-void createBMP(BITMAPFILEHEADER, BITMAPINFOHEADERV3X, unsigned char**, int, int, char*);
-int checkArg(int, char**);
+int scanShifting();
+int scanInverse(int );
+void ceasarCipher(unsigned char **, int , int , int , int );
+void endec(unsigned char **, int , int , int , int );
 char* createNewName(char*, int);
+void createNewBMP(unsigned char **, BITMAPFILEHEADER , BITMAPINFOHEADERV3X , int , char *, int );
 
 #include "bmpImage.c"
